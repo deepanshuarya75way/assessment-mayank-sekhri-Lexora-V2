@@ -3,24 +3,26 @@
 import { useState } from "react";
 import { MessageSquareText, AlignLeft, Tags, Sparkles, Loader2, FileText } from "lucide-react";
 import { DocumentChatPanel } from "@/components/dashboard/document-chat-panel";
+import { PdfPreviewPanel, ActiveCitation } from "@/components/dashboard/pdf-preview-panel";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { API_BASE_URL } from "@/lib/api";
 import { RemoveDocumentButton } from "./remove-document-button";
 
-export function WorkspaceTabs({ 
-  userId, 
-  workspace, 
+export function WorkspaceTabs({
+  userId,
+  workspace,
   initialMessages,
-  workspaceDocuments
-}: { 
-  userId: string; 
-  workspace: any; 
-  initialMessages: any[]; 
+  workspaceDocuments,
+}: {
+  userId: string;
+  workspace: any;
+  initialMessages: any[];
   workspaceDocuments: any[];
 }) {
   const [activeTab, setActiveTab] = useState<"overview" | "chat">("overview");
+  const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const router = useRouter();
 
@@ -28,16 +30,21 @@ export function WorkspaceTabs({
     try {
       setIsGenerating(true);
       const client = createClient();
-      const { data: { session } } = await client.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+
       if (!session?.access_token) return;
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/workspaces/${workspace.id}/summarize?user_id=${userId}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
+      const res = await fetch(
+        `${API_BASE_URL}/api/v1/workspaces/${workspace.id}/summarize?user_id=${userId}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         }
-      });
+      );
 
       if (res.ok) {
         router.refresh();
@@ -86,14 +93,18 @@ export function WorkspaceTabs({
                   <AlignLeft className="h-5 w-5 text-emerald-400" />
                   Workspace Summary
                 </h3>
-                <Button 
-                  onClick={handleGenerateSummary} 
+                <Button
+                  onClick={handleGenerateSummary}
                   disabled={isGenerating || workspaceDocuments.length === 0}
                   variant="outline"
                   size="sm"
                   className="bg-white/5 border-white/10 text-white hover:bg-white/10"
                 >
-                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
                   {workspace.summary ? "Regenerate" : "Generate Summary"}
                 </Button>
               </div>
@@ -105,7 +116,9 @@ export function WorkspaceTabs({
                 <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/10 rounded-2xl bg-black/20">
                   <AlignLeft className="h-10 w-10 text-slate-600 mb-3" />
                   <p className="text-slate-400">Workspace summary is not available yet.</p>
-                  <p className="text-xs text-slate-500 mt-1">Add documents and click Generate Summary.</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Add documents and click Generate Summary.
+                  </p>
                 </div>
               )}
             </div>
@@ -118,8 +131,8 @@ export function WorkspaceTabs({
               {workspace.entities && workspace.entities.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {workspace.entities.map((entity: string, idx: number) => (
-                    <span 
-                      key={idx} 
+                    <span
+                      key={idx}
                       className="px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 transition-colors"
                     >
                       {entity}
@@ -127,44 +140,74 @@ export function WorkspaceTabs({
                   ))}
                 </div>
               ) : (
-                 <p className="text-slate-500 text-sm text-center py-8">No entities extracted.</p>
+                <p className="text-slate-500 text-sm text-center py-8">No entities extracted.</p>
               )}
             </div>
           </div>
 
           <div className="lg:col-span-1 space-y-6">
             <div className="glass-panel border border-white/10 rounded-3xl p-6">
-               <h3 className="text-lg font-semibold text-white mb-4">Documents ({workspaceDocuments.length})</h3>
-               <div className="space-y-3">
-                 {workspaceDocuments.map((doc: any) => (
-                   <div key={doc.id} className="flex flex-col gap-2 p-4 rounded-xl bg-white/5 border border-white/5 group relative hover:bg-white/10 transition-colors">
-                     <div className="flex items-start justify-between gap-3">
-                       <div className="flex items-center gap-3">
-                         <FileText className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                         <span className="text-sm font-medium text-slate-200">{doc.title}</span>
-                       </div>
-                       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                         <RemoveDocumentButton workspaceId={workspace.id} documentId={doc.id} userId={userId} />
-                       </div>
-                     </div>
-                     {doc.summary ? (
-                       <p className="text-xs text-slate-400 line-clamp-2 pl-7">{doc.summary}</p>
-                     ) : (
-                       <p className="text-xs text-slate-500 pl-7 italic">No summary generated.</p>
-                     )}
-                   </div>
-                 ))}
-                 {workspaceDocuments.length === 0 && (
-                   <p className="text-sm text-slate-500 text-center py-4">No documents added yet.</p>
-                 )}
-               </div>
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Documents ({workspaceDocuments.length})
+              </h3>
+              <div className="space-y-3">
+                {workspaceDocuments.map((doc: any) => (
+                  <div
+                    key={doc.id}
+                    className="flex flex-col gap-2 p-4 rounded-xl bg-white/5 border border-white/5 group relative hover:bg-white/10 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm font-medium text-slate-200">{doc.title}</span>
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <RemoveDocumentButton
+                          workspaceId={workspace.id}
+                          documentId={doc.id}
+                          userId={userId}
+                        />
+                      </div>
+                    </div>
+                    {doc.summary ? (
+                      <p className="text-xs text-slate-400 line-clamp-2 pl-7">{doc.summary}</p>
+                    ) : (
+                      <p className="text-xs text-slate-500 pl-7 italic">No summary generated.</p>
+                    )}
+                  </div>
+                ))}
+                {workspaceDocuments.length === 0 && (
+                  <p className="text-sm text-slate-500 text-center py-4">
+                    No documents added yet.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {activeTab === "chat" && (
-        <DocumentChatPanel userId={userId} workspaceId={workspace.id} initialMessages={initialMessages} />
+        <div
+          className={
+            activeCitation ? "grid grid-cols-1 xl:grid-cols-2 gap-6 items-start" : "w-full"
+          }
+        >
+          <DocumentChatPanel
+            userId={userId}
+            workspaceId={workspace.id}
+            initialMessages={initialMessages}
+            activeCitation={activeCitation}
+            onSelectCitation={(citation) => setActiveCitation(citation)}
+          />
+
+          {activeCitation && (
+            <PdfPreviewPanel
+              citation={activeCitation}
+              onClose={() => setActiveCitation(null)}
+            />
+          )}
+        </div>
       )}
     </div>
   );

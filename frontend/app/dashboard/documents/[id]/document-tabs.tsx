@@ -3,21 +3,23 @@
 import { useState } from "react";
 import { MessageSquareText, AlignLeft, Tags, Sparkles, Loader2 } from "lucide-react";
 import { DocumentChatPanel } from "@/components/dashboard/document-chat-panel";
+import { PdfPreviewPanel, ActiveCitation } from "@/components/dashboard/pdf-preview-panel";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { API_BASE_URL } from "@/lib/api";
 
-export function DocumentTabs({ 
-  userId, 
-  document, 
-  initialMessages 
-}: { 
-  userId: string; 
-  document: any; 
-  initialMessages: any[]; 
+export function DocumentTabs({
+  userId,
+  document,
+  initialMessages,
+}: {
+  userId: string;
+  document: any;
+  initialMessages: any[];
 }) {
   const [activeTab, setActiveTab] = useState<"overview" | "chat">("overview");
+  const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const router = useRouter();
 
@@ -25,15 +27,17 @@ export function DocumentTabs({
     try {
       setIsGenerating(true);
       const client = createClient();
-      const { data: { session } } = await client.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+
       if (!session?.access_token) return;
 
       const res = await fetch(`${API_BASE_URL}/api/v1/documents/${document.id}/summarize`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (res.ok) {
@@ -83,14 +87,18 @@ export function DocumentTabs({
                   <AlignLeft className="h-5 w-5 text-emerald-400" />
                   Executive Summary
                 </h3>
-                <Button 
-                  onClick={handleGenerateSummary} 
+                <Button
+                  onClick={handleGenerateSummary}
                   disabled={isGenerating}
                   variant="outline"
                   size="sm"
                   className="bg-white/5 border-white/10 text-white hover:bg-white/10"
                 >
-                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
                   {document.summary ? "Regenerate" : "Generate Summary"}
                 </Button>
               </div>
@@ -102,7 +110,9 @@ export function DocumentTabs({
                 <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/10 rounded-2xl bg-black/20">
                   <AlignLeft className="h-10 w-10 text-slate-600 mb-3" />
                   <p className="text-slate-400">Summary is not available yet.</p>
-                  <p className="text-xs text-slate-500 mt-1">If the document is still processing, please wait.</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    If the document is still processing, please wait.
+                  </p>
                 </div>
               )}
             </div>
@@ -116,8 +126,8 @@ export function DocumentTabs({
               {document.entities && document.entities.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {document.entities.map((entity: string, idx: number) => (
-                    <span 
-                      key={idx} 
+                    <span
+                      key={idx}
                       className="px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 transition-colors"
                     >
                       {entity}
@@ -125,7 +135,7 @@ export function DocumentTabs({
                   ))}
                 </div>
               ) : (
-                 <p className="text-slate-500 text-sm text-center py-8">No entities extracted.</p>
+                <p className="text-slate-500 text-sm text-center py-8">No entities extracted.</p>
               )}
             </div>
           </div>
@@ -133,7 +143,26 @@ export function DocumentTabs({
       )}
 
       {activeTab === "chat" && (
-        <DocumentChatPanel userId={userId} documentId={document.id} initialMessages={initialMessages} />
+        <div
+          className={
+            activeCitation ? "grid grid-cols-1 xl:grid-cols-2 gap-6 items-start" : "w-full"
+          }
+        >
+          <DocumentChatPanel
+            userId={userId}
+            documentId={document.id}
+            initialMessages={initialMessages}
+            activeCitation={activeCitation}
+            onSelectCitation={(citation) => setActiveCitation(citation)}
+          />
+
+          {activeCitation && (
+            <PdfPreviewPanel
+              citation={activeCitation}
+              onClose={() => setActiveCitation(null)}
+            />
+          )}
+        </div>
       )}
     </div>
   );

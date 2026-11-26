@@ -127,6 +127,58 @@ async def get_document_status_route(
             raise exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+@router.get("/{document_id}/preview-url")
+async def get_document_preview_url_route(
+    request: Request,
+    document_id: str,
+):
+    try:
+        user_id = _authenticate_user(request)
+        supabase = get_supabase_client()
+
+        query = (
+            supabase.table("documents")
+            .select("id, title, file_path")
+            .eq("id", document_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        rows = query.data if isinstance(query.data, list) else []
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found",
+            )
+
+        doc = rows[0]
+        file_path = doc.get("file_path")
+        if not file_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Document has no stored file path",
+            )
+
+        bucket = "documents"
+        signed = supabase.storage.from_(bucket).create_signed_url(file_path, 3600)
+        signed_url = signed.get("signedURL") or signed.get("signedUrl")
+        if not signed_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate preview URL",
+            )
+
+        return {
+            "document_id": str(doc["id"]),
+            "title": doc.get("title") or "Document",
+            "mime_type": "application/pdf",
+            "url": signed_url,
+        }
+    except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 
 @router.delete("/{document_id}", response_model=DocumentDeleteResponse)
 async def delete_document_route(
